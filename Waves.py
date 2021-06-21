@@ -27,7 +27,7 @@ class wave:
         self._retrieve_info()
 
         # propogate
-        self.propogate()
+        self._propogate()
 
         # plot
         self.plot()
@@ -75,7 +75,7 @@ class wave:
         self.step = self.speed * self.timestep
         self.t_final = 10.0
 
-        self.count = 100
+        self.size = 100
 
         self.start_point = np.array([1.0,1.0])
 
@@ -84,9 +84,46 @@ class wave:
                                 [2.0,2.0],
                                 [2.0,0.0],
                                 [0.0,0.0]])
-        
 
-    def propogate(self):
+
+    def _offset(x,y,d):
+        """Method which determines the offset of a shape.
+        """
+
+        # function that determines the midpoint between points
+        def midpt(x,y):
+
+            # create x[i] and x[i+1] arrays
+            x0 = x[:-1]
+            x1 = x[1:]
+
+            # create y[i] and y[i+1] arrays
+            y0 = y[:-1]
+            y1 = y[1:]
+
+            # find the midpoint between each point
+            midx = (x0+x1)/2.0
+            midy = (y0+y1)/2.0
+            return midx,midy
+
+        # create x[i] and x[i+1] arrays
+        x0 = x[:-1]
+        x1 = x[1:]
+
+        # create y[i] and y[i+1] arrays
+        y0 = y[:-1]
+        y1 = y[1:]
+
+        # get the midpoints of the given line
+        midx,midy = midpt(x,y)
+
+        # determine the offset x and y values for each midpoint
+        offx = midx - d*(y1-y0)/( (x0-x1)**2.0 + (y0-y1)**2.0 )**0.5
+        offy = midy + d*(x1-x0)/( (x0-x1)**2.0 + (y0-y1)**2.0 )**0.5
+        
+        return offx,offy
+
+    def _propogate(self):
         """Method which
         """
 
@@ -94,19 +131,19 @@ class wave:
         self.n_steps = int(self.t_final / self.timestep)
 
         # initialize wave array
-        wave = np.zeros((2,self.count,self.n_steps))
+        wave = np.zeros((self.n_steps,self.size,2))
 
         # create initial droplet
-        t = np.linspace(0.0,2. * np.pi,num=self.count)
+        t = np.linspace(0.0,2. * np.pi,num=self.size)
         wave[0,:,0] = self.step / 100. * np.cos(t) + self.start_point[0]
-        wave[1,:,0] = self.step / 100. * np.sin(t) + self.start_point[1]
+        wave[0,:,1] = self.step / 100. * np.sin(t) + self.start_point[1]
 
         # run through each time step and determine new wave location
         for i in range(1,self.n_steps):
 
             # determine new wave location
-            wave[0,:,i] = self.step * i * np.cos(t) + self.start_point[0]
-            wave[1,:,i] = self.step * i * np.sin(t) + self.start_point[1]
+            wave[i,:,0] = self.step * i * np.cos(t) + self.start_point[0]
+            wave[i,:,1] = self.step * i * np.sin(t) + self.start_point[1]
 
 
         # make wave global
@@ -122,7 +159,7 @@ class wave:
 
         # plot each wave propogation
         for i in range(self.n_steps):
-            plt.plot(self.wave[0,:,i],self.wave[1,:,i],"b")
+            plt.plot(self.wave[i,:,0],self.wave[i,:,1],"b")
         
         # show plot
         plt.axis("equal")
