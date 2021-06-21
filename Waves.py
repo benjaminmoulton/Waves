@@ -1,3 +1,8 @@
+"""
+git add --all
+git commit -m "Reason"
+git push -u origin main
+"""
 import numpy as np
 import json
 import matplotlib.pyplot as plt
@@ -102,6 +107,7 @@ class wave:
         # flip and negate
         direction = 1. * np.flip(direc)
         direction[1] *= -1.0
+        
 
         # calculate C value
         C = np.sum( direction * particle )
@@ -114,15 +120,14 @@ class wave:
             # calculate determinant
             det = direction[0]*self.normals[i,1] - \
                 self.normals[i,0]*direction[1]
-            if det != 0.0:
+            
+            # if intersection in correct direction, find it
+            if det > 0.0:
                 x = (self.normals[i,1]*C - direction[1]*self.normals[i,2])/det
                 y = (direction[0]*self.normals[i,2] - self.normals[i,0]*C)/det
 
-                n = (x - particle[0]) / direction[0]
-                print(det,particle,direction,self.normals[i],n)
-                if n >= 0.0:
-                    segment.append(i)
-                    crossings.append(np.array([x,y]))
+                segment.append(i)
+                crossings.append(np.array([x,y]))
         
         # determine closest crossing
         crossings = np.array(crossings)
@@ -130,19 +135,9 @@ class wave:
             (crossings[:,1]-particle[1])**2. )**0.5
         index = np.argwhere(dists == np.min(dists))[0,0]
 
-        
-        # determine correct crossings (in direction)
-        for i in range(len(crossings)):
-            plt.plot(crossings[i][0],crossings[i][1],"ro")
-        
-        plt.plot(crossings[index][0],crossings[index][1],"ko")
-
-
-        # find segemnt which will hit
-        # find lengths ti ll hit
-        # subtract 1 each iteration
-        # change direction, determine new point
-
+        # calculate steps to impact
+        to_imp = dists[index] / self.step
+        return np.array([index,to_imp, crossings[index,0],crossings[index,1]])
 
 
     def _propogate(self):
@@ -156,9 +151,9 @@ class wave:
         wave = np.zeros((self.n_steps,self.size,2))
 
         # create initial droplet
-        t = np.linspace(0.0,0.75 * np.pi,num=self.size)
-        wave[0,:,0] = self.step / 100. * np.cos(t) + self.start_point[0]
-        wave[0,:,1] = self.step / 100. * np.sin(t) + self.start_point[1]
+        t = np.linspace(0.0,2. * np.pi,num=self.size)
+        wave[0,:,0] = self.start_point[0] # self.step / 100. * np.cos(t) + 
+        wave[0,:,1] = self.start_point[1] # self.step / 100. * np.sin(t) + 
 
         # define vector array
         # where col 0 = dx, col 1 = dy
@@ -166,15 +161,38 @@ class wave:
         self.dir[:,0] = np.cos(t)
         self.dir[:,1] = np.sin(t)
 
+        # initialize intersection array
+        hits = np.zeros((self.size,4))
+
         # run through each point, determine intersecting segment and num hits
         for i in range(self.size):
-            self._to_impact(wave[0,i],self.dir[i])
+            
+            # find segment number, steps to intersection, and intersect pt
+            hits[i] = self._to_impact(wave[0,i],self.dir[i])
 
         # run through each time step and determine new wave location
         for i in range(1,self.n_steps):
 
             # determine new wave location
             wave[i] = wave[i-1] + self.step * self.dir
+
+            # remove one step distance from to-impact length
+            hits[:,1] -= 1.0
+
+            for j in range(self.size):
+                if hits[j,1] <= 0.0:
+                    
+                    # determine new direction
+                    r = self.dir[j] - 2. * \
+                        np.dot(self.dir[j],self.normals[int(hits[j,0]),:2]) * \
+                            self.normals[int(hits[j,0]),:2]
+
+                    v0 = hits[j,2:]
+                    v1 = hits[j,2:] + r
+                    plt.plot([v0[0],v1[0]],[v0[1],v1[1]])
+
+                    # determine "correct" wave point
+                    wave[i,j] = hits[j,2:] + (1. + hits[j,1]) * r
 
 
         # make wave global
