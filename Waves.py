@@ -73,58 +73,80 @@ class wave:
         self.speed = 0.3 # m/s
         self.timestep = 1.0 # s
         self.step = self.speed * self.timestep
-        self.t_final = 10.0
+        self.t_final = 5.0
 
-        self.size = 100
+        self.size = 10
 
         self.start_point = np.array([1.0,1.0])
 
         self.shape = np.array([ [0.0,0.0],
-                                [0.0,2.0],
-                                [2.0,2.0],
                                 [2.0,0.0],
+                                [2.0,2.0],
+                                [0.0,2.0],
                                 [0.0,0.0]])
-
-
-    def _offset(x,y,d):
-        """Method which determines the offset of a shape.
-        """
-
-        # function that determines the midpoint between points
-        def midpt(x,y):
-
-            # create x[i] and x[i+1] arrays
-            x0 = x[:-1]
-            x1 = x[1:]
-
-            # create y[i] and y[i+1] arrays
-            y0 = y[:-1]
-            y1 = y[1:]
-
-            # find the midpoint between each point
-            midx = (x0+x1)/2.0
-            midy = (y0+y1)/2.0
-            return midx,midy
-
-        # create x[i] and x[i+1] arrays
-        x0 = x[:-1]
-        x1 = x[1:]
-
-        # create y[i] and y[i+1] arrays
-        y0 = y[:-1]
-        y1 = y[1:]
-
-        # get the midpoints of the given line
-        midx,midy = midpt(x,y)
-
-        # determine the offset x and y values for each midpoint
-        offx = midx - d*(y1-y0)/( (x0-x1)**2.0 + (y0-y1)**2.0 )**0.5
-        offy = midy + d*(x1-x0)/( (x0-x1)**2.0 + (y0-y1)**2.0 )**0.5
         
-        return offx,offy
+        # determine shape normals
+        self.normals = np.array([   [ 0.0,-1.0, 0.0],
+                                    [ 1.0, 0.0, 0.0],
+                                    [ 0.0, 1.0, 0.0],
+                                    [-1.0, 0.0, 0.0]])
+        
+        # determine C values
+        self.normals[:,2] = self.normals[:,0] * self.shape[:-1,0] + \
+        self.normals[:,1] * self.shape[:-1,1]
+
+
+    def _to_impact(self,particle,direc):
+        """Method which
+        """
+        # flip and negate
+        direction = 1. * np.flip(direc)
+        direction[1] *= -1.0
+
+        # calculate C value
+        C = np.sum( direction * particle )
+
+        # run through each "line" and determine whether it crosses
+        segment = []
+        crossings = []
+        for i in range(self.normals.shape[0]):
+
+            # calculate determinant
+            det = direction[0]*self.normals[i,1] - \
+                self.normals[i,0]*direction[1]
+            if det != 0.0:
+                x = (self.normals[i,1]*C - direction[1]*self.normals[i,2])/det
+                y = (direction[0]*self.normals[i,2] - self.normals[i,0]*C)/det
+
+                n = (x - particle[0]) / direction[0]
+                print(det,particle,direction,self.normals[i],n)
+                if n >= 0.0:
+                    segment.append(i)
+                    crossings.append(np.array([x,y]))
+        
+        # determine closest crossing
+        crossings = np.array(crossings)
+        dists = ((crossings[:,0]-particle[0])**2. + \
+            (crossings[:,1]-particle[1])**2. )**0.5
+        index = np.argwhere(dists == np.min(dists))[0,0]
+
+        
+        # determine correct crossings (in direction)
+        for i in range(len(crossings)):
+            plt.plot(crossings[i][0],crossings[i][1],"ro")
+        
+        plt.plot(crossings[index][0],crossings[index][1],"ko")
+
+
+        # find segemnt which will hit
+        # find lengths ti ll hit
+        # subtract 1 each iteration
+        # change direction, determine new point
+
+
 
     def _propogate(self):
-        """Method which
+        """Method which propogates the wave
         """
 
         # determine number of time steps
@@ -134,16 +156,25 @@ class wave:
         wave = np.zeros((self.n_steps,self.size,2))
 
         # create initial droplet
-        t = np.linspace(0.0,2. * np.pi,num=self.size)
+        t = np.linspace(0.0,0.75 * np.pi,num=self.size)
         wave[0,:,0] = self.step / 100. * np.cos(t) + self.start_point[0]
         wave[0,:,1] = self.step / 100. * np.sin(t) + self.start_point[1]
+
+        # define vector array
+        # where col 0 = dx, col 1 = dy
+        self.dir = np.zeros((self.size,2))
+        self.dir[:,0] = np.cos(t)
+        self.dir[:,1] = np.sin(t)
+
+        # run through each point, determine intersecting segment and num hits
+        for i in range(self.size):
+            self._to_impact(wave[0,i],self.dir[i])
 
         # run through each time step and determine new wave location
         for i in range(1,self.n_steps):
 
             # determine new wave location
-            wave[i,:,0] = self.step * i * np.cos(t) + self.start_point[0]
-            wave[i,:,1] = self.step * i * np.sin(t) + self.start_point[1]
+            wave[i] = wave[i-1] + self.step * self.dir
 
 
         # make wave global
