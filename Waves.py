@@ -6,6 +6,7 @@ git push -u origin main
 import numpy as np
 import json
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 class wave:
     """A class which can be used to determine a nozzle geometry
@@ -24,6 +25,9 @@ class wave:
 
     
     def __init__(self,input_vars={}):
+
+        # report
+        print("Wave Maker written by Ben Moulton...\n")
 
         # # get info or raise error
         # self._get_input_vars(input_vars)
@@ -68,6 +72,9 @@ class wave:
     def _retrieve_info(self):
         """A function which retrieves the information and stores it globally.
         """
+
+        # report
+        print("Initializing simulation...\n")
         
         # store variables from file input dictionary
 
@@ -76,11 +83,11 @@ class wave:
 
         # define variables
         self.speed = 0.3 # m/s
-        self.timestep = 1.0 # s
+        self.timestep = 0.01 # s
         self.step = self.speed * self.timestep
-        self.t_final = 5.0
+        self.t_final = 20.0
 
-        self.size = 10
+        self.size = 200
 
         self.start_point = np.array([1.0,1.0])
 
@@ -144,6 +151,9 @@ class wave:
         """Method which propogates the wave
         """
 
+        # report
+        print("Propogating wave...\n")
+
         # determine number of time steps
         self.n_steps = int(self.t_final / self.timestep)
 
@@ -181,18 +191,32 @@ class wave:
 
             for j in range(self.size):
                 if hits[j,1] <= 0.0:
+
+                    # # plot to impact vector
+                    # v0 = wave[i-1,j]
+                    # v1 = wave[i-1,j] + (1 + hits[j,1]) * self.step * self.dir[j]
+                    # plt.plot([v0[0],v1[0]],[v0[1],v1[1]])
+
+                    # determine opposite of normal
+                    if self.dir[j,0] >= 0 and self.dir[j,1] >= 0:
+                        direc = -1. * self.dir[j]
+                    else:
+                        direc = 1. * self.dir[j]                  
                     
                     # determine new direction
-                    r = self.dir[j] - 2. * \
-                        np.dot(self.dir[j],self.normals[int(hits[j,0]),:2]) * \
+                    self.dir[j] = direc - 2. * \
+                        np.dot(direc,self.normals[int(hits[j,0]),:2]) * \
                             self.normals[int(hits[j,0]),:2]
-
-                    v0 = hits[j,2:]
-                    v1 = hits[j,2:] + r
-                    plt.plot([v0[0],v1[0]],[v0[1],v1[1]])
+                    
+                    # v0 = hits[j,2:]
+                    # v1 = hits[j,2:] + self.dir[j] * (-hits[j,1]) * self.step
+                    # plt.plot([v0[0],v1[0]],[v0[1],v1[1]])
 
                     # determine "correct" wave point
-                    wave[i,j] = hits[j,2:] + (1. + hits[j,1]) * r
+                    wave[i,j] = hits[j,2:]+(-hits[j,1])*self.step*self.dir[j]
+
+                    # update direction and impact info
+                    hits[j] = self._to_impact(wave[i,j],self.dir[j])
 
 
         # make wave global
@@ -203,16 +227,56 @@ class wave:
         """Method
         """
 
-        # plot wave propogation
-        plt.plot(self.shape[:,0],self.shape[:,1],"k")
+        # # report
+        # print("Creating animation...\n")
 
-        # plot each wave propogation
-        for i in range(self.n_steps):
-            plt.plot(self.wave[i,:,0],self.wave[i,:,1],"b")
+        # # plot wave propogation
+        # plt.plot(self.shape[:,0],self.shape[:,1],"k")
+
+        # # plot each wave propogation
+        # for i in range(self.n_steps):
+        #     plt.plot(self.wave[i,:,0],self.wave[i,:,1],"b")
         
-        # show plot
-        plt.axis("equal")
-        plt.show()
+        # # show plot
+        # plt.axis("equal")
+        # plt.show()
+
+
+        # First set up the figure, the axis, and the plot element we want to animate
+        fig, ax = plt.subplots()
+
+        ax.set_xlim(( -0.4911904761904766 , 2.4611904761904766 ))
+        ax.set_ylim(( -0.1                , 2.1                ))
+
+        line, = ax.plot([], [],"b")
+
+        # initialization function: plot the background of each frame
+        def init():
+            line.set_data([], [])
+            plt.plot(self.shape[:,0],self.shape[:,1],"k")
+            plt.axis("off")
+            return (line,)
+
+        # animation function. This is called sequentially
+        def animate(i):
+            x = self.wave[i,:,0]
+            y = self.wave[i,:,1]
+            line.set_data(x, y)
+            return (line,)
+
+        # call the animator. blit=True means only re-draw the parts that 
+        # have changed.
+        anim = FuncAnimation(fig, animate, init_func=init,\
+                                        frames=self.n_steps, interval=10, blit=True)
+        
+        # report
+        print("Saving   animation...\n")
+        print("mp4")
+        anim.save("/home/ben/Videos/animation.mp4")
+        
+        # print("gif")
+        # anim.save("animation.gif",writer="imagemagick",fps=60)
+        # plt.show()
 
 
 
