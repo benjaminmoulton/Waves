@@ -10,12 +10,10 @@ from matplotlib.animation import FuncAnimation
 
 class wave:
     """A class which can be used to determine a nozzle geometry
-
     Parameters
     ----------
     input_vars : string or dict , optional
         Must be a .json file or python dictionary of the format
-
     Raises
     ------
     TypeError
@@ -87,7 +85,7 @@ class wave:
         self.step = self.speed * self.timestep
         self.t_final = 20.0
 
-        self.size = 200
+        self.size = 1000
 
         self.start_point = np.array([1.0,1.0])
 
@@ -96,12 +94,40 @@ class wave:
                                 [2.0,2.0],
                                 [0.0,2.0],
                                 [0.0,0.0]])
-        
-        # determine shape normals
-        self.normals = np.array([   [ 0.0,-1.0, 0.0],
-                                    [ 1.0, 0.0, 0.0],
-                                    [ 0.0, 1.0, 0.0],
-                                    [-1.0, 0.0, 0.0]])
+
+        # calculate center of shape
+        center = np.average(self.shape[:-1].T,axis=1)
+
+        # determine normals based on shape points
+        self.normals = np.zeros((self.shape[:-1].shape[0],3))
+
+        # run through each normal, determine it
+        for i in range(self.normals.shape[0]):
+            # determine components of slope
+            dx = self.shape[i+1,0] - self.shape[i,0]
+            dy = self.shape[i+1,1] - self.shape[i,1]
+
+            # determine normal
+            norm = np.array([dy,-dx]) / (dx**2. + dy**2.)**0.5
+
+            # determine midpoint
+            midpt = np.average(self.shape[i:i+2])
+
+            # determine distance from center to midpoint
+            dist = (np.sum((midpt-center)**2.))**0.5
+
+            # determine points a set distance from midpoint using normal
+            p1 = midpt + norm * dist / 10.
+            p2 = midpt - norm * dist / 10.
+            d1 = (np.sum((p1-center)**2.))**0.5
+            d2 = (np.sum((p2-center)**2.))**0.5
+            
+            # resolve difference
+            if d2 > d1:
+                norm *= -1.
+            
+            # add in to array
+            self.normals[i,:2] = norm
         
         # determine C values
         self.normals[:,2] = self.normals[:,0] * self.shape[:-1,0] + \
@@ -222,6 +248,9 @@ class wave:
         # make wave global
         self.wave = wave
 
+        for i in range(self.n_steps):
+            print(wave[i,0],wave[i,-1])
+
 
     def plot(self):
         """Method
@@ -272,7 +301,7 @@ class wave:
         # report
         print("Saving   animation...\n")
         print("mp4")
-        anim.save("/home/ben/Videos/animation.mp4")
+        anim.save("animation.mp4")
         
         # print("gif")
         # anim.save("animation.gif",writer="imagemagick",fps=60)
@@ -281,4 +310,4 @@ class wave:
 
 
 
-waver = wave()
+waver = wave("input.json")
